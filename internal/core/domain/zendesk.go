@@ -8,21 +8,23 @@ import (
 	"zd/internal/utils"
 )
 
-type ZendeskMock struct {
+type Zendesk struct {
 	userServiceLocation string
 	eventPath           string
 	userPath            string
+	requester           utils.Requester
 }
 
-func NewZendeskMock(userServiceLocation, eventPath, userPath string) ZendeskMock {
-	return ZendeskMock{
+func NewZendesk(requester utils.Requester, userServiceLocation, eventPath, userPath string) Zendesk {
+	return Zendesk{
 		userServiceLocation: userServiceLocation,
 		eventPath:           eventPath,
 		userPath:            userPath,
+		requester:           requester,
 	}
 }
 
-func (z ZendeskMock) GetUserEvent() (*UserEvent, error) {
+func (z Zendesk) GetUserEvent() (*UserEvent, error) {
 	users, err := z.getAvailableUsers()
 	if err != nil {
 		return nil, fmt.Errorf("error while getting all available users: %s", err)
@@ -47,14 +49,14 @@ func (z ZendeskMock) GetUserEvent() (*UserEvent, error) {
 		EventID: randomEvent.ID,
 	}, nil
 }
-func (z ZendeskMock) getAvailableEvents() ([]Event, error) {
+func (z Zendesk) getAvailableEvents() ([]Event, error) {
 	// "http://localhost:4001/api/v1/event",
 	requestURL := fmt.Sprintf(
 		"http://%s%s",
 		z.userServiceLocation,
 		z.eventPath,
 	)
-	data, err := utils.GetRequest(requestURL)
+	data, err := z.requester.Get(requestURL)
 	if err != nil {
 		return nil, fmt.Errorf("error while getting available events: %s", err)
 	}
@@ -67,14 +69,14 @@ func (z ZendeskMock) getAvailableEvents() ([]Event, error) {
 
 	return events, nil
 }
-func (z ZendeskMock) getAvailableUsers() ([]User, error) {
+func (z Zendesk) getAvailableUsers() ([]User, error) {
 	// "http://localhost:4001/api/v1/user"
 	requestURL := fmt.Sprintf(
 		"http://%s%s",
 		z.userServiceLocation,
 		z.userPath,
 	)
-	data, err := utils.GetRequest(requestURL)
+	data, err := z.requester.Get(requestURL)
 	if err != nil {
 		return nil, fmt.Errorf("error while getting available users: %s", err)
 	}
@@ -91,6 +93,11 @@ func (z ZendeskMock) getAvailableUsers() ([]User, error) {
 func randomSelection[O User | Event](obj []O) O {
 	randomNumberGenerator := rand.New(rand.NewSource(time.Now().Unix()))
 	lastIndex := len(obj) - 1
+
+	// If O is an array with a single element, just return that element
+	if lastIndex == 0 {
+		return obj[lastIndex]
+	}
 	randomNumber := randomNumberGenerator.Intn(lastIndex)
 
 	return obj[randomNumber]
